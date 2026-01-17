@@ -5,7 +5,9 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 import json
-from utils.repo_handler import clone_repo
+from utils.repo_handler import clone_repo as clone_github_repo
+from analyzer import analyze_rule, aggregate_results
+from utils.llm_client import FeatherlessClient
 
 load_dotenv()
 
@@ -218,32 +220,76 @@ async def clone_repo(repo_url: str):
 
 
 @app.post("/analyze")
-async def analyze_compliance(
-    privacy_policy: UploadFile = File(...), repo_url: Optional[str] = Form(None)
-):
+async def analyze_compliance(repo_url: str = Form(...)):
     """
-    Analyze RGPD compliance from privacy policy and optional repository URL
+    Analyze RGPD compliance for a GitHub repository.
 
-    Returns compliance scores for:
-    - Consent management
-    - Security practices
-    - Data lifecycle
+    Analyzes code and documentation for:
+    - Consent management (cookies, tracking, analytics)
+    - Security practices (authentication, encryption, passwords)
+    - Data lifecycle (retention, deletion, portability)
+
+    Args:
+        repo_url: GitHub repository URL
+
+    Returns:
+        Compliance scores and violations per category
     """
+    try:
+        # Clone repository
+        repo_path = clone_github_repo(repo_url)
 
-    # TODO: Implement analysis logic using agents
-    # For now, return mock response structure
+        # Initialize LLM client
+        llm_client = FeatherlessClient()
 
-    return {
-        "status": "success",
-        "filename": privacy_policy.filename,
-        "repo_url": repo_url,
-        "results": {
-            "consent": {"score": 0, "issues": [], "recommendations": []},
-            "security": {"score": 0, "issues": [], "recommendations": []},
-            "lifecycle": {"score": 0, "issues": [], "recommendations": []},
-        },
-        "overall_score": 0,
-    }
+        # Analyze all rules by category
+        results = {"consent": [], "security": [], "lifecycle": []}
+
+        # Process consent rules
+        print(f"Analyzing consent rules...")
+        for rule in RGPD_RULES.get("consent_rules", []):
+            result = await analyze_rule(rule, repo_path, llm_client)
+            results["consent"].append(result)
+
+        # Process security rules
+        print(f"Analyzing security rules...")
+        for rule in RGPD_RULES.get("security_rules", []):
+            result = await analyze_rule(rule, repo_path, llm_client)
+            results["security"].append(result)
+
+        # Process lifecycle rules
+        print(f"Analyzing lifecycle rules...")
+        for rule in RGPD_RULES.get("lifecycle_rules", []):
+            result = await analyze_rule(rule, repo_path, llm_client)
+            results["lifecycle"].append(result)
+
+        # Aggregate results by category
+        final_results = {
+            "consent": aggregate_results(results["consent"]),
+            "security": aggregate_results(results["security"]),
+            "lifecycle": aggregate_results(results["lifecycle"]),
+        }
+
+        # Calculate overall score
+        category_scores = [
+            final_results["consent"]["score"],
+            final_results["security"]["score"],
+            final_results["lifecycle"]["score"],
+        ]
+        overall_score = sum(category_scores) // len(category_scores)
+
+        return {
+            "status": "success",
+            "repo_url": repo_url,
+            "overall_score": overall_score,
+            "results": final_results,
+        }
+
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":

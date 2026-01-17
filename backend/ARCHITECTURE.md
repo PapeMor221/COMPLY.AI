@@ -390,11 +390,12 @@ hashed = hashlib.md5(password.encode()).hexdigest()
 - [x] Test repo_handler with demo repo (https://github.com/LyCrash/FakeRepo4-COMPLY.AI) ✅
 - [x] `utils/file_selector.py` - 2 functions (filter_by_keywords, select_best_files) ✅
 - [x] Test file_selector with keyword filtering and LLM selection ✅
-- [ ] `utils/llm_client.py` - enhance existing (add structured response parsing)
-- [ ] `utils/json_parser.py` - 1 function (parse_json_response)
-- [ ] `analyzer.py` - 2 functions (analyze_rule, call_llm_for_rule)
-- [ ] `main.py` - implement /analyze endpoint (replace mock response)
-- [ ] Test with 1 rule end-to-end
-- [ ] Test with all rules
+- [x] `utils/llm_client.py` - Fixed Featherless API endpoint (chat/completions) ✅
+- [x] `utils/json_parser.py` - parse_json_response with validation ✅
+- [x] `analyzer.py` - analyze_rule, call_llm_for_rule, aggregate_results ✅
+- [x] `main.py` - implement /analyze endpoint (real analysis, not mock) ✅
+- [x] Test with 1 rule end-to-end (consent: 45/100, security: 55/100, 9 violations found) ✅
+- [x] Test with all rules (Overall: 39/100, 19 violations across consent & security) ✅
 - [ ] Handle errors gracefully
+- [ ] Frontend integration
 - [ ] Record demo video
