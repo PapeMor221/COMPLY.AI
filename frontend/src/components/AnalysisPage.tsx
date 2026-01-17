@@ -1,17 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { 
-  Shield, 
-  Github, 
-  Rocket, 
-  Loader2, 
-  Zap, 
-  Lock, 
-  Brain,
-  Check,
-  Moon,
-  Sun
-} from "lucide-react";
-
+import { useState } from "react";
+import { Shield, Github, Rocket, Zap, Lock, Brain, Check, Loader2, Sparkles } from "lucide-react";
 interface AnalysisOption {
   id: string;
   emoji: string;
@@ -20,372 +8,258 @@ interface AnalysisOption {
   recommended: boolean;
   defaultChecked: boolean;
 }
-
-const ANALYSIS_OPTIONS: AnalysisOption[] = [
-  {
-    id: "rgpd",
-    emoji: "🇪🇺",
-    title: "RGPD Compliance",
-    description: "Conformité RGPD complète",
-    recommended: true,
-    defaultChecked: true,
-  },
-  {
-    id: "aiact",
-    emoji: "🤖",
-    title: "AI Act Compliance",
-    description: "Règlement européen IA",
-    recommended: true,
-    defaultChecked: true,
-  },
-  {
-    id: "pii",
-    emoji: "🔍",
-    title: "Détection PII",
-    description: "Emails, IPs, données sensibles",
-    recommended: true,
-    defaultChecked: true,
-  },
-  {
-    id: "thirdparty",
-    emoji: "🌐",
-    title: "Flux données tiers",
-    description: "OpenAI, Stripe, Firebase...",
-    recommended: true,
-    defaultChecked: true,
-  },
-  {
-    id: "legal",
-    emoji: "📄",
-    title: "Documentation légale",
-    description: "Privacy Policy, CGU, DPA",
-    recommended: true,
-    defaultChecked: true,
-  },
-  {
-    id: "security",
-    emoji: "🔐",
-    title: "Audit sécurité",
-    description: "Secrets hardcodés, vulnérabilités",
-    recommended: false,
-    defaultChecked: false,
-  },
-];
-
-const LOADING_MESSAGES = [
-  "Clone du repository...",
-  "Scan du code source...",
-  "Analyse des dépendances...",
-  "Détection IA en cours...",
-  "Génération du rapport...",
-];
-
+const ANALYSIS_OPTIONS: AnalysisOption[] = [{
+  id: "rgpd",
+  emoji: "🇪🇺",
+  title: "RGPD Compliance",
+  description: "Conformité RGPD complète",
+  recommended: true,
+  defaultChecked: true
+}, {
+  id: "aiact",
+  emoji: "🤖",
+  title: "AI Act Compliance",
+  description: "Règlement européen IA",
+  recommended: true,
+  defaultChecked: true
+}, {
+  id: "pii",
+  emoji: "🔍",
+  title: "Détection PII",
+  description: "Emails, IPs, données sensibles",
+  recommended: true,
+  defaultChecked: true
+}, {
+  id: "thirdparty",
+  emoji: "🌐",
+  title: "Flux données tiers",
+  description: "OpenAI, Stripe, Firebase...",
+  recommended: true,
+  defaultChecked: true
+}, {
+  id: "legal",
+  emoji: "📄",
+  title: "Documentation légale",
+  description: "Privacy Policy, CGU, DPA",
+  recommended: true,
+  defaultChecked: true
+}, {
+  id: "security",
+  emoji: "🔐",
+  title: "Audit sécurité",
+  description: "Secrets hardcodés, vulnérabilités",
+  recommended: false,
+  defaultChecked: false
+}];
+const PROGRESS_MESSAGES = ["Clone du repository...", "Scan des fichiers source...", "Analyse IA en cours...", "Détection des données personnelles...", "Vérification conformité RGPD...", "Génération du rapport..."];
 interface AnalysisPageProps {
-  onAnalysisComplete: (repoUrl: string, selectedOptions: string[]) => void;
-  isDarkMode: boolean;
-  toggleDarkMode: () => void;
+  onAnalyze: (repoUrl: string, options: Record<string, boolean>) => void;
+  isAnalyzing: boolean;
+  analysisProgress: number;
+  error?: string | null;
 }
-
-export const AnalysisPage = ({ 
-  onAnalysisComplete, 
-  isDarkMode, 
-  toggleDarkMode 
-}: AnalysisPageProps) => {
+export function AnalysisPage({
+  onAnalyze,
+  isAnalyzing,
+  analysisProgress,
+  error
+}: AnalysisPageProps) {
   const [repoUrl, setRepoUrl] = useState("");
-  const [selectedChecks, setSelectedChecks] = useState<Record<string, boolean>>(
-    Object.fromEntries(ANALYSIS_OPTIONS.map(opt => [opt.id, opt.defaultChecked]))
-  );
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    ANALYSIS_OPTIONS.forEach(opt => {
+      initial[opt.id] = opt.defaultChecked;
+    });
+    return initial;
+  });
   const [urlTouched, setUrlTouched] = useState(false);
-  const [showShake, setShowShake] = useState(false);
-
-  // GitHub URL validation
-  const isValidGithubUrl = useCallback((url: string) => {
-    const githubRegex = /^https?:\/\/(www\.)?github\.com\/[\w-]+\/[\w.-]+\/?$/;
-    return githubRegex.test(url);
-  }, []);
-
-  const isUrlValid = isValidGithubUrl(repoUrl);
-  const hasSelectedOptions = Object.values(selectedChecks).some(Boolean);
-  const canAnalyze = isUrlValid && hasSelectedOptions;
-
+  const [shakeButton, setShakeButton] = useState(false);
+  const githubRegex = /^https:\/\/github\.com\/[\w-]+\/[\w.-]+\/?$/;
+  const isValidUrl = githubRegex.test(repoUrl.trim());
+  const hasSelectedOption = Object.values(selectedOptions).some(Boolean);
+  const canAnalyze = isValidUrl && hasSelectedOption && !isAnalyzing;
+  const progressMessageIndex = Math.floor(analysisProgress / 100 * PROGRESS_MESSAGES.length);
+  const currentProgressMessage = PROGRESS_MESSAGES[Math.min(progressMessageIndex, PROGRESS_MESSAGES.length - 1)];
   const toggleOption = (id: string) => {
-    setSelectedChecks(prev => ({ ...prev, [id]: !prev[id] }));
+    setSelectedOptions(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
   };
-
-  const handleAnalyze = useCallback(() => {
+  const handleAnalyze = () => {
     if (!canAnalyze) {
-      setShowShake(true);
-      setTimeout(() => setShowShake(false), 500);
+      setShakeButton(true);
+      setTimeout(() => setShakeButton(false), 500);
       return;
     }
-
-    setIsAnalyzing(true);
-    setAnalysisProgress(0);
-
-    // Simulate analysis progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 5;
-      setAnalysisProgress(progress);
-      
-      const messageIndex = Math.min(
-        Math.floor(progress / 20),
-        LOADING_MESSAGES.length - 1
-      );
-      setLoadingMessage(LOADING_MESSAGES[messageIndex]);
-
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          const selected = Object.entries(selectedChecks)
-            .filter(([_, checked]) => checked)
-            .map(([id]) => id);
-          onAnalysisComplete(repoUrl, selected);
-        }, 500);
-      }
-    }, 150);
-  }, [canAnalyze, repoUrl, selectedChecks, onAnalysisComplete]);
-
-  // Konami code easter egg
-  useEffect(() => {
-    const konami = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
-    let konamiIndex = 0;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === konami[konamiIndex]) {
-        konamiIndex++;
-        if (konamiIndex === konami.length) {
-          // Trigger confetti!
-          const colors = ['#6366f1', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'];
-          for (let i = 0; i < 100; i++) {
-            setTimeout(() => {
-              const confetti = document.createElement('div');
-              confetti.style.cssText = `
-                position: fixed;
-                width: 10px;
-                height: 10px;
-                background: ${colors[Math.floor(Math.random() * colors.length)]};
-                left: ${Math.random() * 100}vw;
-                top: 100vh;
-                border-radius: 50%;
-                pointer-events: none;
-                z-index: 9999;
-                animation: confetti 2s ease-out forwards;
-              `;
-              document.body.appendChild(confetti);
-              setTimeout(() => confetti.remove(), 2000);
-            }, i * 20);
-          }
-          konamiIndex = 0;
-        }
-      } else {
-        konamiIndex = 0;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  return (
-    <div className="min-h-screen">
+    onAnalyze(repoUrl.trim(), selectedOptions);
+  };
+  const getInputClass = () => {
+    if (!urlTouched) return "input-modern";
+    if (isValidUrl) return "input-modern valid";
+    return "input-modern invalid";
+  };
+  return <div className="min-h-screen gradient-hero-subtle dark:bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border/50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 group cursor-pointer relative">
-            <div className="p-2 rounded-xl bg-primary/10">
-              <Shield className="w-7 h-7 text-primary" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight">
-              COMPLY<span className="text-primary">.AI</span>
-            </span>
-            {/* Tooltip */}
-            <div className="absolute left-0 top-full mt-2 tooltip-content whitespace-nowrap">
-              Propulsé par Claude Sonnet 4
-            </div>
-          </div>
+      <header className="py-6 px-4 relative z-10">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="badge-beta">BETA</span>
-            <button
-              onClick={toggleDarkMode}
-              className="dark-toggle"
-              aria-label="Toggle dark mode"
-            >
-              {isDarkMode ? (
-                <Sun className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <Moon className="w-5 h-5 text-muted-foreground" />
-              )}
-            </button>
+            <div className="relative">
+              <div className="p-3 rounded-2xl gradient-primary gradient-glow">
+                <Shield className="w-7 h-7 text-primary-foreground" />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold tracking-tight text-gradient">COMPLY.AI</span>
+              <span className="text-xs text-muted-foreground font-medium tracking-wide">Compliance Copilot</span>
+            </div>
           </div>
+          <span className="badge-beta animate-pulse-slow">BETA</span>
         </div>
       </header>
 
-      <main className="px-6 py-8 max-w-7xl mx-auto">
-        {/* Hero Section */}
-        <section className="hero-gradient mb-12 opacity-0 animate-fade-in-up">
-          <div className="flex flex-col md:flex-row items-center gap-10">
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
-                Analysez la conformité de votre codebase en 30 secondes
-              </h1>
-              <p className="text-xl opacity-90">
-                RGPD, AI Act, sécurité des données — tout automatisé par IA
-              </p>
-            </div>
-            <div className="flex-shrink-0">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white/10 flex items-center justify-center animate-pulse-slow">
-                <Github className="w-20 h-20 md:w-24 md:h-24 text-white/90" />
-              </div>
+      {/* Hero Section */}
+      <section className="gradient-hero py-24 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-1/2 -left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute -bottom-1/2 -right-1/4 w-[600px] h-[600px] bg-gradient-to-tl from-white/5 to-transparent rounded-full blur-3xl" />
+        </div>
+        
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          
+          
+          <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 tracking-tight animate-fade-in leading-tight">
+            Analysez la conformité de votre
+            <span className="block mt-2 bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+              codebase en 30 secondes
+            </span>
+          </h1>
+          <p className="text-xl text-white/80 mb-12 animate-fade-in stagger-1 max-w-2xl mx-auto">
+            RGPD, AI Act, sécurité des données — tout automatisé par IA
+          </p>
+          <div className="animate-float">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 blur-3xl bg-white/20 rounded-full scale-150" />
+              <Github className="w-24 h-24 text-white/90 relative z-10" />
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Input Section */}
-        <section className="card-elevated p-8 md:p-10 mb-10 opacity-0 animate-fade-in-up stagger-1" style={{ boxShadow: 'var(--shadow-2xl)' }}>
-          <div className="max-w-3xl mx-auto">
-            <label className="flex items-center gap-2 text-lg font-semibold mb-4">
-              <Github className="w-5 h-5 text-muted-foreground" />
+      {/* Main Content */}
+      <main className="px-4 -mt-16 pb-24 relative z-10">
+        <div className="max-w-4xl mx-auto space-y-10">
+          {/* URL Input Card */}
+          <div className="glass-card-lg p-8 animate-slide-up">
+            <label className="flex items-center gap-3 text-lg font-semibold text-foreground mb-5">
+              <div className="p-2 rounded-xl bg-primary/10">
+                <Github className="w-5 h-5 text-primary" />
+              </div>
               URL de votre repository GitHub
             </label>
             <div className="relative">
-              <input
-                type="url"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                onBlur={() => setUrlTouched(true)}
-                placeholder="https://github.com/votre-org/votre-repo"
-                className={`input-github pr-12 ${
-                  urlTouched && repoUrl
-                    ? isUrlValid
-                      ? 'input-valid'
-                      : 'input-invalid'
-                    : ''
-                }`}
-              />
-              {urlTouched && repoUrl && isUrlValid && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                  <Check className="w-6 h-6 text-success animate-fade-in" />
-                </div>
-              )}
+              <input type="url" value={repoUrl} onChange={e => setRepoUrl(e.target.value)} onBlur={() => setUrlTouched(true)} placeholder="https://github.com/votre-org/votre-repo" className={getInputClass()} disabled={isAnalyzing} />
+              {urlTouched && isValidUrl && <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                  <div className="p-1.5 rounded-full bg-success/10">
+                    <Check className="w-5 h-5 text-success" />
+                  </div>
+                </div>}
             </div>
-            {urlTouched && repoUrl && !isUrlValid && (
-              <p className="mt-2 text-sm text-destructive animate-fade-in">
+            {urlTouched && !isValidUrl && repoUrl && <p className="text-destructive text-sm mt-3 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
                 Veuillez entrer une URL GitHub valide (ex: https://github.com/org/repo)
-              </p>
-            )}
-            <p className="mt-3 text-sm text-muted-foreground">
+              </p>}
+            <p className="text-muted-foreground text-sm mt-4">
               Nous analyserons votre code, vos configs et votre documentation
             </p>
-          </div>
-        </section>
-
-        {/* Options Section */}
-        <section className="mb-10 opacity-0 animate-fade-in-up stagger-2">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mb-2">Que souhaitez-vous analyser ?</h2>
-            <p className="text-muted-foreground">Sélectionnez au moins une option</p>
+            {error && <div className="mt-5 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                <p className="text-destructive text-sm font-medium">{error}</p>
+              </div>}
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {ANALYSIS_OPTIONS.map((option, index) => (
-              <div
-                key={option.id}
-                onClick={() => toggleOption(option.id)}
-                className={`option-card ${selectedChecks[option.id] ? 'selected' : ''} opacity-0 animate-fade-in-up`}
-                style={{ animationDelay: `${0.3 + index * 0.05}s` }}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <span className="text-4xl">{option.emoji}</span>
-                  <div className="flex items-center gap-2">
-                    {option.recommended && (
-                      <span className="badge-recommended">Recommandé</span>
-                    )}
-                    <div className="checkbox">
-                      {selectedChecks[option.id] && (
-                        <Check className="w-4 h-4 text-white" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <h3 className="font-bold text-lg mb-1">{option.title}</h3>
-                <p className="text-sm text-muted-foreground">{option.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Analyze Button */}
-        <section className="mb-12 opacity-0 animate-fade-in-up stagger-3">
-          <button
-            onClick={handleAnalyze}
-            disabled={isAnalyzing}
-            className={`btn-huge w-full flex items-center justify-center gap-3 ${
-              showShake ? 'animate-shake' : ''
-            }`}
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>{loadingMessage}</span>
-              </>
-            ) : (
-              <>
-                <Rocket className="w-6 h-6" />
-                <span>Lancer l'analyse complète</span>
-              </>
-            )}
-          </button>
-
-          {isAnalyzing && (
-            <div className="mt-6 animate-fade-in">
-              <div className="progress-bar">
-                <div
-                  className="progress-fill bg-gradient-to-r from-primary to-secondary"
-                  style={{ width: `${analysisProgress}%` }}
-                />
-              </div>
-              <p className="text-center text-sm text-muted-foreground mt-2">
-                {analysisProgress}% - {loadingMessage}
+          {/* Options Grid */}
+          <div className="animate-slide-up stagger-2">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
+                Que souhaitez-vous analyser ?
+              </h2>
+              <p className="text-muted-foreground">
+                Sélectionnez au moins une option pour démarrer
               </p>
             </div>
-          )}
-        </section>
 
-        {/* Features */}
-        <section className="grid md:grid-cols-3 gap-4 opacity-0 animate-fade-in-up stagger-4">
-          <div className="feature-card">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold">Analyse en &lt; 1 minute</p>
-              <p className="text-sm text-muted-foreground">Résultats instantanés</p>
-            </div>
-          </div>
-          <div className="feature-card">
-            <div className="p-2 rounded-lg bg-success/10">
-              <Lock className="w-5 h-5 text-success" />
-            </div>
-            <div>
-              <p className="font-semibold">Code jamais stocké</p>
-              <p className="text-sm text-muted-foreground">100% confidentiel</p>
-            </div>
-          </div>
-          <div className="feature-card">
-            <div className="p-2 rounded-lg bg-secondary/10">
-              <Brain className="w-5 h-5 text-secondary" />
-            </div>
-            <div>
-              <p className="font-semibold">IA Claude Sonnet 4</p>
-              <p className="text-sm text-muted-foreground">Analyse de pointe</p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {ANALYSIS_OPTIONS.map((option, index) => <button key={option.id} onClick={() => toggleOption(option.id)} disabled={isAnalyzing} className={`option-card text-left opacity-0 animate-scale-in ${selectedOptions[option.id] ? "selected" : ""}`} style={{
+              animationDelay: `${index * 0.05}s`,
+              animationFillMode: "forwards"
+            }}>
+                  {option.recommended && <span className="badge-recommended absolute -top-2.5 right-4">
+                      RECOMMANDÉ
+                    </span>}
+                  <div className="flex items-start gap-4">
+                    <div className={`checkbox-modern flex-shrink-0 ${selectedOptions[option.id] ? "checked" : ""}`}>
+                      {selectedOptions[option.id] && <Check className="w-4 h-4 text-primary-foreground" />}
+                    </div>
+                    <div>
+                      <span className="text-4xl block mb-3">{option.emoji}</span>
+                      <h3 className="font-bold text-foreground mb-1.5">{option.title}</h3>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </div>
+                  </div>
+                </button>)}
             </div>
           </div>
-        </section>
+
+          {/* Analyze Button */}
+          <div className="animate-slide-up stagger-3">
+            <button onClick={handleAnalyze} disabled={!canAnalyze} className={`btn-primary w-full py-6 text-xl gradient-glow ${shakeButton ? "animate-shake" : ""}`}>
+              {isAnalyzing ? <>
+                  <Loader2 className="w-6 h-6 animate-spin-slow" />
+                  <span>Analyse en cours...</span>
+                </> : <>
+                  <Rocket className="w-6 h-6" />
+                  <span>Lancer l'analyse complète</span>
+                </>}
+            </button>
+
+            {/* Progress Bar */}
+            {isAnalyzing && <div className="mt-8 space-y-4">
+                <div className="progress-bar h-3">
+                  <div className="progress-bar-fill primary animate-shimmer" style={{
+                width: `${analysisProgress}%`
+              }} />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <p className="text-muted-foreground font-medium">
+                    {currentProgressMessage}
+                  </p>
+                  <span className="text-primary font-bold">{analysisProgress}%</span>
+                </div>
+              </div>}
+          </div>
+
+          {/* Features */}
+          <div className="grid md:grid-cols-3 gap-4 animate-slide-up stagger-4">
+            <div className="feature-card group">
+              <div className="p-2 rounded-xl bg-warning/10 group-hover:bg-warning/15 transition-colors">
+                <Zap className="w-6 h-6 text-warning" />
+              </div>
+              <span className="font-semibold text-foreground">Analyse en &lt; 1 min</span>
+            </div>
+            <div className="feature-card group">
+              <div className="p-2 rounded-xl bg-success/10 group-hover:bg-success/15 transition-colors">
+                <Lock className="w-6 h-6 text-success" />
+              </div>
+              <span className="font-semibold text-foreground">Code jamais stocké</span>
+            </div>
+            <div className="feature-card group">
+              <div className="p-2 rounded-xl bg-secondary/10 group-hover:bg-secondary/15 transition-colors">
+                <Brain className="w-6 h-6 text-secondary" />
+              </div>
+              <span className="font-semibold text-foreground">IA Claude Sonnet 4</span>
+            </div>
+          </div>
+        </div>
       </main>
-    </div>
-  );
-};
+    </div>;
+}
