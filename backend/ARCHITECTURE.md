@@ -388,7 +388,8 @@ hashed = hashlib.md5(password.encode()).hexdigest()
 
 - [x] `utils/repo_handler.py` - 3 functions (clone_repo, get_all_files, read_file) ✅
 - [x] Test repo_handler with demo repo (https://github.com/LyCrash/FakeRepo4-COMPLY.AI) ✅
-- [ ] `utils/file_selector.py` - 2 functions
+- [x] `utils/file_selector.py` - 2 functions (filter_by_keywords, select_best_files) ✅
+- [x] Test file_selector with keyword filtering and LLM selection ✅
 - [ ] `utils/llm_client.py` - enhance existing (add structured response parsing)
 - [ ] `utils/json_parser.py` - 1 function (parse_json_response)
 - [ ] `analyzer.py` - 2 functions (analyze_rule, call_llm_for_rule)
