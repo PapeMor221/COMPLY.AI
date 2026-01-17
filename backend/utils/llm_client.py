@@ -32,7 +32,7 @@ class FeatherlessClient:
     async def generate_completion(
         self,
         prompt: str,
-        model: str = "default",
+        model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct",
         max_tokens: int = 1000,
         temperature: float = 0.7,
     ) -> str:
@@ -41,7 +41,7 @@ class FeatherlessClient:
 
         Args:
             prompt: Input prompt text
-            model: Model identifier
+            model: Model identifier (default: Meta-Llama-3.1-8B-Instruct)
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
 
@@ -51,11 +51,11 @@ class FeatherlessClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/completions",
+                    f"{self.base_url}/chat/completions",
                     headers=self.headers,
                     json={
-                        "prompt": prompt,
                         "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": max_tokens,
                         "temperature": temperature,
                     },
@@ -64,7 +64,9 @@ class FeatherlessClient:
                 response.raise_for_status()
 
                 data = response.json()
-                return data.get("choices", [{}])[0].get("text", "")
+                return (
+                    data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                )
 
             except httpx.HTTPError as e:
                 raise Exception(f"Featherless API error: {str(e)}")

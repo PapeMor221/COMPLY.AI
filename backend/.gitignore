@@ -52,3 +52,6 @@ htmlcov/
 # Uploads (for local development)
 uploads/
 temp/
+
+# cloned repos
+cloned_repos/

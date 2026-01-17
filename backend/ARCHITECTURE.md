@@ -59,7 +59,7 @@ repo/
 ```python
 def clone_repo(repo_url: str) -> str:
     """Clone repo, return local path. Shallow clone, max 100MB."""
-    
+
 def get_all_files(repo_path: str) -> dict:
     """
     Returns: {
@@ -68,7 +68,7 @@ def get_all_files(repo_path: str) -> dict:
     }
     Exclude: node_modules, dist, build, .git
     """
-    
+
 def read_file(filepath: str) -> str:
     """Read text file. For PDFs, extract text."""
 ```
@@ -79,7 +79,7 @@ def read_file(filepath: str) -> str:
 def filter_by_keywords(files: list, keywords: list) -> list:
     """
     Filter files containing keywords in filename.
-    
+
     Example:
     files = ["src/cookie.js", "src/api.js", "src/auth.js"]
     keywords = ["cookie", "consent", "banner"]
@@ -89,7 +89,7 @@ def filter_by_keywords(files: list, keywords: list) -> list:
 async def select_best_files(filtered_files: list, rule: dict, max_files: int = 5) -> list:
     """
     Use LLM to pick most relevant files.
-    
+
     Prompt: "Given these files: {filtered_files}
              We need to check: {rule['code_checks']['must_find']}
              Select 3-5 most relevant. Return JSON array of filenames."
@@ -102,7 +102,7 @@ async def select_best_files(filtered_files: list, rule: dict, max_files: int = 5
 async def analyze_rule(rule: dict, repo_path: str) -> dict:
     """
     Main analysis function. Works for ANY rule type.
-    
+
     Steps:
     1. Get all files from repo
     2. Filter by keywords (code + docs separately)
@@ -112,29 +112,29 @@ async def analyze_rule(rule: dict, repo_path: str) -> dict:
     6. Parse JSON response
     7. Return result
     """
-    
+
     # Get files
     all_files = get_all_files(repo_path)
-    
+
     # Code path
     code_files = []
     if rule["check_type"] in ["code", "both"]:
         code_keywords = rule["code_checks"]["file_keywords"]
         filtered_code = filter_by_keywords(all_files["code_files"], code_keywords)
         code_files = await select_best_files(filtered_code, rule, max_files=3)
-    
+
     # Docs path
     doc_files = []
     if rule["check_type"] in ["document", "both"]:
         doc_files = all_files["doc_files"]  # Analyze all docs
-    
+
     # Read files
     selected_files = code_files + doc_files
     file_contents = {f: read_file(f) for f in selected_files}
-    
+
     # Call LLM
     result = await call_llm_for_rule(rule, file_contents)
-    
+
     return result
 
 async def call_llm_for_rule(rule: dict, file_contents: dict) -> dict:
@@ -143,19 +143,19 @@ async def call_llm_for_rule(rule: dict, file_contents: dict) -> dict:
     Call Featherless API.
     Parse JSON response.
     """
-    
+
     system_prompt = rule["agent_prompt"]
-    
+
     user_message = f"""
     FILES TO ANALYZE:
     {format_files(file_contents)}
-    
+
     RED PATTERNS TO CHECK:
     {json.dumps(rule["code_checks"]["red_patterns"], indent=2)}
-    
+
     DOCUMENT REQUIREMENTS:
     {json.dumps(rule["document_checks"], indent=2)}
-    
+
     RETURN JSON:
     {{
       "passed": true/false,
@@ -172,7 +172,7 @@ async def call_llm_for_rule(rule: dict, file_contents: dict) -> dict:
       "score": 0-100
     }}
     """
-    
+
     response = await call_featherless_llm(system_prompt, user_message)
     return parse_json_response(response)
 ```
@@ -189,36 +189,36 @@ async def analyze_repo(repo_url: str):
     4. Aggregate by category
     5. Return results
     """
-    
+
     # Clone
     repo_path = clone_repo(repo_url)
-    
+
     # Load rules
     with open("data/rgpd_rules_v2.json") as f:
         rules = json.load(f)
-    
+
     # Analyze all rules
     results = {
         "consent": [],
         "security": [],
         "lifecycle": []
     }
-    
+
     # Process consent rules
     for rule in rules["consent_rules"]:
         result = await analyze_rule(rule, repo_path)
         results["consent"].append(result)
-    
+
     # Process security rules
     for rule in rules["security_rules"]:
         result = await analyze_rule(rule, repo_path)
         results["security"].append(result)
-    
+
     # Process lifecycle rules
     for rule in rules["lifecycle_rules"]:
         result = await analyze_rule(rule, repo_path)
         results["lifecycle"].append(result)
-    
+
     # Aggregate scores
     final = {
         "consent": {
@@ -234,7 +234,7 @@ async def analyze_repo(repo_url: str):
             "violations": flatten([r["violations"] for r in results["lifecycle"]])
         }
     }
-    
+
     return final
 ```
 
@@ -291,7 +291,7 @@ def parse_json_response(response: str) -> dict:
     - Pure JSON: {"passed": false, ...}
     - With markdown: ```json\n{...}\n```
     - With text + JSON: "Here's the analysis:\n{...}"
-    
+
     Handle all cases.
     """
     # Strip markdown
@@ -300,12 +300,12 @@ def parse_json_response(response: str) -> dict:
         cleaned = cleaned.split("```json")[1].split("```")[0]
     elif "```" in cleaned:
         cleaned = cleaned.split("```")[1].split("```")[0]
-    
+
     # Extract JSON object
     match = re.search(r'\{.*\}', cleaned, re.DOTALL)
     if match:
         return json.loads(match.group())
-    
+
     raise ValueError("No JSON found in LLM response")
 ```
 
@@ -386,15 +386,15 @@ hashed = hashlib.md5(password.encode()).hexdigest()
 
 ## TODO List
 
-- [ ] `utils/repo_handler.py` - 3 functions
-- [ ] `utils/file_selector.py` - 2 functions
-- [ ] `utils/llm_client.py` - 1 function
-- [ ] `utils/json_parser.py` - 1 function
-- [ ] `analyzer.py` - 2 functions
-- [ ] `main.py` - 1 endpoint
-- [ ] Create test repo with violations
+- [x] `utils/repo_handler.py` - 3 functions (clone_repo, get_all_files, read_file) ✅
+- [x] Test repo_handler with demo repo (https://github.com/LyCrash/FakeRepo4-COMPLY.AI) ✅
+- [x] `utils/file_selector.py` - 2 functions (filter_by_keywords, select_best_files) ✅
+- [x] Test file_selector with keyword filtering and LLM selection ✅
+- [ ] `utils/llm_client.py` - enhance existing (add structured response parsing)
+- [ ] `utils/json_parser.py` - 1 function (parse_json_response)
+- [ ] `analyzer.py` - 2 functions (analyze_rule, call_llm_for_rule)
+- [ ] `main.py` - implement /analyze endpoint (replace mock response)
 - [ ] Test with 1 rule end-to-end
 - [ ] Test with all rules
 - [ ] Handle errors gracefully
-- [ ] Create demo repo
 - [ ] Record demo video
